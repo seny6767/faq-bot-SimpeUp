@@ -8,8 +8,8 @@
 1. Клонируйте репозиторий:
 
 bash
-git clone https://github.com/yourusername/faq-chat.git
-cd faq-chat
+git clone https://github.com/seny6767/faq-bot-SimpeUp.git
+cd prj
 
 2. Установите зависимости:
 
