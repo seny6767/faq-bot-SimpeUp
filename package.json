@@ -1,0 +1,12 @@
+{
+  "name": "faq-chat",
+  "version": "1.0.0",
+  "main": "index.html",
+  "scripts": {
+    "build": "sass src/styles.scss dist/styles.css",
+    "dev": "sass --watch src/styles.scss dist/styles.css"
+  },
+  "devDependencies": {
+    "sass": "^1.69.5"
+  }
+}

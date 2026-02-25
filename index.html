@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ Чат</title>
+  <link rel="stylesheet" href="dist/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>FAQ Чат</h1>
+      <p>Задайте вопрос по базе знаний, я постараюсь найти ответ.</p>
+    </header>
+
+    <div class="main-layout">
+      <!-- Левая колонка: чат -->
+      <div class="chat-section">
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area">
+          <input type="text" id="questionInput" placeholder="Введите ваш вопрос...">
+          <button id="sendButton">Отправить</button>
+          <button id="clearButton">Очистить</button>
+        </div>
+      </div>
+
+      <!-- Правая колонка: информация -->
+      <div class="info-section" id="infoSection">
+        <div class="similar-questions">
+          <h3>Похожие вопросы</h3>
+          <div id="similarList"></div>
+        </div>
+
+        <div class="quick-buttons">
+          <h3>Быстрые вопросы</h3>
+          <div id="quickButtons" class="quick-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно подтверждения очистки -->
+  <div class="modal-overlay" id="modalOverlay" style="display: none;">
+    <div class="modal">
+      <p>Вы уверены, что хотите очистить чат?</p>
+      <div class="modal-buttons">
+        <button id="modalYes">Да</button>
+        <button id="modalNo">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
