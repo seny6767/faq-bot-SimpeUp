@@ -1,34 +1,25 @@
 ## FAQ Чат
-Интерактивный чат для ответов на часто задаваемые вопросы. Полностью фронтенд, сохранение истории в localStorage, анимации, тёмная тема.
+FAQ чат для ответов на часто задаваемые вопросы.
 
-1. Цель проекта
+
+## Цель проекта
 Демонстрация навыков работы с DOM, состоянием, поиском по ключевым словам, SCSS, сборкой yarn и дополнительным UX (анимация печати, блокировка интерфейса, модальное окно).
+
 
 ## Установка и запуск
 1. Клонируйте репозиторий:
-
-bash
 git clone https://github.com/seny6767/faq-bot-SimpeUp.git
-cd prj
+cd faq-bot-SimpeUp
 
 2. Установите зависимости:
-
-bash
 yarn install
-# или npm install
 
 3. Скомпилируйте SCSS:
-
-Однократно: yarn build (или npm run build)
-
-Режим разработки: yarn dev (или npm run dev)
+Однократно: yarn build
+Режим разработки: yarn dev
 
 4. Запустите локальный сервер (обязательно!):
-
-VS Code: Live Server → правый клик на index.html
-
+VS Code: Live Server, запустить Live Server
 Через npx: npx live-server
-
 Python: python -m http.server
-
-Откройте http://localhost:8000 (или другой порт).
+Откройте http://localhost:8000 (или другой Ваш порт)
