@@ -2,11 +2,14 @@ import { FAQ } from './faq.js';
 
 const STORAGE_KEY = 'faqChatHistory';
 const MAX_SIMILAR = 5;
-const SCORE_QUESTION_WEIGHT = 2;
-const SCORE_TAG_WEIGHT = 1;
-const MIN_SCORE = 1;
+const SCORE_QUESTION_EXACT = 2;
+const SCORE_QUESTION_FUZZY = 1;
+const SCORE_TAG_EXACT = 1;
+const MIN_SCORE = 1.2;
+const MIN_WORD_LENGTH = 3;
+const MIN_LENGTH_FOR_FUZZY = 5;
+const MAX_FUZZY_DIST = 2;
 
-// DOM элементы
 const chatMessagesEl = document.getElementById('chatMessages');
 const questionInput = document.getElementById('questionInput');
 const sendButton = document.getElementById('sendButton');
@@ -18,84 +21,99 @@ const modalOverlay = document.getElementById('modalOverlay');
 const modalYes = document.getElementById('modalYes');
 const modalNo = document.getElementById('modalNo');
 
-// Состояние
 let messages = [];
 let similarQuestions = [];
 let lastQuery = '';
 let typingIndicator = null;
 let isProcessing = false;
 
-// Вспомогательные функции (без изменений)
-function normalizeText(str) {
-  return str.toLowerCase().replace(/[^\w\sа-яё]/gi, '').trim();
-}
+const wordFrequency = {};
 
-function getWords(str) {
-  return normalizeText(str).split(/\s+/).filter(w => w.length > 0);
-}
+const normalizeText = str => str.toLowerCase().replace(/[^\w\sа-яё]/gi, '').trim();
+const getWords = str => normalizeText(str).split(/\s+/).filter(w => w.length >= MIN_WORD_LENGTH);
 
-// поиск ответа в fqa + валидациия ответа по тегам и проверка на вхождение подстроки
-function searchFAQ(query) {
+FAQ.forEach(item => {
+  getWords(item.q).forEach(w => wordFrequency[w] = (wordFrequency[w] || 0) + 1);
+  if (item.tags) item.tags.forEach(tag => {
+    const normTag = normalizeText(tag);
+    if (normTag.length >= MIN_WORD_LENGTH) wordFrequency[normTag] = (wordFrequency[normTag] || 0) + 1;
+  });
+});
+
+const levenshtein = (a, b) => {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const matrix = Array(b.length + 1).fill().map((_, i) => [i]);
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+};
+
+const searchFAQ = query => {
   const queryWords = getWords(query);
-  if (queryWords.length === 0) return [];
-
+  if (!queryWords.length) return [];
   return FAQ.map(item => {
     let score = 0;
     const questionWords = getWords(item.q);
-    const tags = item.tags ? item.tags.map(t => normalizeText(t)) : [];
-
+    const tags = item.tags ? item.tags.map(t => normalizeText(t)).filter(t => t.length >= MIN_WORD_LENGTH) : [];
     queryWords.forEach(qw => {
-      if (questionWords.some(qWord => qWord.includes(qw) || qw.includes(qWord))) {
-        score += SCORE_QUESTION_WEIGHT;
+      const freq = wordFrequency[qw] || 0;
+      const weight = 1 / (freq + 1);
+      const exactInQuestion = questionWords.some(qWord => qWord === qw);
+      if (exactInQuestion) score += SCORE_QUESTION_EXACT * weight;
+      if (qw.length >= MIN_LENGTH_FOR_FUZZY && !exactInQuestion) {
+        questionWords.forEach(qWord => {
+          if (levenshtein(qWord, qw) <= MAX_FUZZY_DIST) score += SCORE_QUESTION_FUZZY * weight;
+        });
       }
-      if (tags.some(tag => tag.includes(qw) || qw.includes(tag))) {
-        score += SCORE_TAG_WEIGHT;
-      }
+      if (tags.some(tag => tag === qw)) score += SCORE_TAG_EXACT * weight;
     });
-
     return { item, score };
   }).filter(r => r.score > 0).sort((a, b) => b.score - a.score);
-}
+};
 
-// получить ответ
-function getAnswer(query) {
+const getAnswer = query => {
   const results = searchFAQ(query);
   let answer = null;
   let similar = [];
-
-  if (results.length > 0) {
+  if (results.length) {
     const best = results[0];
     if (best.score >= MIN_SCORE) answer = best.item.a;
     similar = results.slice(0, MAX_SIMILAR).map(r => r.item.q);
   }
-
   return {
-    answer: answer || 'Не было найдено точного ответа. Возможно, вам помогут похожие вопросы справа в колонке.',
+    answer: answer || 'Нет точно ответа. Возможно, вам помогут вопросы из правой колонки.',
     similar
   };
-}
+};
 
-function highlightMatches(text, query) {
+const highlightMatches = (text, query) => {
   if (!query) return text;
   const words = getWords(query);
   if (!words.length) return text;
-
   let result = text;
   words.forEach(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     result = result.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '<mark>$1</mark>');
   });
   return result;
-}
+};
 
-// Отрисовка похожих вопросов
-function renderSimilar() {
+const renderSimilar = () => {
   if (!similarListEl) return;
   if (!similarQuestions.length) {
     similarListEl.innerHTML = '<p>Нет похожих вопросов</p>';
     return;
   }
-
   const list = document.createElement('ul');
   similarQuestions.forEach(qText => {
     const li = document.createElement('li');
@@ -106,10 +124,9 @@ function renderSimilar() {
   });
   similarListEl.innerHTML = '';
   similarListEl.appendChild(list);
-}
+};
 
-// Отрисовка сообщений
-function renderMessages() {
+const renderMessages = () => {
   chatMessagesEl.innerHTML = '';
   messages.forEach(msg => {
     const msgDiv = document.createElement('div');
@@ -118,14 +135,11 @@ function renderMessages() {
     chatMessagesEl.appendChild(msgDiv);
   });
   scrollToBottom();
-}
+};
 
-// История
-function saveHistory() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-}
+const saveHistory = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
 
-function loadHistory() {
+const loadHistory = () => {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try { messages = JSON.parse(saved); } catch { messages = []; }
@@ -136,14 +150,11 @@ function loadHistory() {
     }];
   }
   renderMessages();
-}
+};
 
-function scrollToBottom() {
-  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-}
+const scrollToBottom = () => chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 
-// Индикатор печати
-function showTypingIndicator() {
+const showTypingIndicator = () => {
   hideTypingIndicator();
   const indicator = document.createElement('div');
   indicator.className = 'message bot typing-indicator';
@@ -151,102 +162,75 @@ function showTypingIndicator() {
   chatMessagesEl.appendChild(indicator);
   typingIndicator = indicator;
   scrollToBottom();
-}
+};
 
-function hideTypingIndicator() {
-  if (typingIndicator) {
-    typingIndicator.remove();
-    typingIndicator = null;
-  }
-}
+const hideTypingIndicator = () => {
+  if (typingIndicator) typingIndicator.remove();
+  typingIndicator = null;
+};
 
-// Анимация печати
-function typeMessage(text, element, delay = 30) {
-  return new Promise(resolve => {
-    let i = 0;
-    element.textContent = '';
-    const interval = setInterval(() => {
-      if (i < text.length) {
-        element.textContent += text.charAt(i);
-        i++;
-        scrollToBottom();
-      } else {
-        clearInterval(interval);
-        resolve();
-      }
-    }, delay);
-  });
-}
+const typeMessage = (text, element, delay = 30) => new Promise(resolve => {
+  let i = 0;
+  element.textContent = '';
+  const interval = setInterval(() => {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+      scrollToBottom();
+    } else {
+      clearInterval(interval);
+      resolve();
+    }
+  }, delay);
+});
 
-// Универсальное добавление сообщения (с анимацией для бота)
-async function addMessage(text, sender, animate = false, save = true) {
+const addMessage = async (text, sender, animate = false, save = true) => {
   const msgDiv = document.createElement('div');
   msgDiv.className = `message ${sender}`;
   chatMessagesEl.appendChild(msgDiv);
   scrollToBottom();
-
-  if (animate && sender === 'bot') {
-    await typeMessage(text, msgDiv, 30);
-  } else {
-    msgDiv.textContent = text;
-  }
-
+  if (animate && sender === 'bot') await typeMessage(text, msgDiv, 30);
+  else msgDiv.textContent = text;
   messages.push({ text, sender, timestamp: Date.now() });
   if (save) saveHistory();
-}
+};
 
-// Блокировка интерфейса
-function setInterfaceLock(locked) {
+const setInterfaceLock = locked => {
   isProcessing = locked;
   questionInput.disabled = locked;
   sendButton.disabled = locked;
   clearButton.disabled = locked;
   infoSection.classList.toggle('locked', locked);
-}
+};
 
-// Модальное окно
-function showModal() {
-  modalOverlay.style.display = 'flex';
-}
+const showModal = () => modalOverlay.style.display = 'flex';
+const hideModal = () => modalOverlay.style.display = 'none';
 
-function hideModal() {
-  modalOverlay.style.display = 'none';
-}
-
-// Отправка вопроса
-async function handleSend() {
+const handleSend = async () => {
   const query = questionInput.value.trim();
   if (!query || isProcessing) return;
-
-  setInterfaceLock(true);
   await addMessage(query, 'user');
-
+  setInterfaceLock(true);
   showTypingIndicator();
   await new Promise(resolve => setTimeout(resolve, 600));
   const { answer, similar } = getAnswer(query);
   hideTypingIndicator();
-
   await addMessage(answer, 'bot', true);
   lastQuery = query;
   similarQuestions = similar;
   renderSimilar();
   questionInput.value = '';
   setInterfaceLock(false);
-}
+};
 
-// Отправка через быстрые кнопки / похожие вопросы
-function sendMessage(text) {
+const sendMessage = text => {
   questionInput.value = text;
   handleSend();
-}
+};
 
-// Очистка чата
-function clearHistory() {
-  showModal();
-}
+const clearHistory = () => showModal();
 
-// Инициализация быстрых кнопок
-function initQuickButtons() {
+const initQuickButtons = () => {
   const quickList = FAQ.slice(0, 8).map(item => item.q);
   quickButtonsEl.innerHTML = '';
   quickList.forEach(q => {
@@ -257,9 +241,8 @@ function initQuickButtons() {
     btn.addEventListener('click', () => sendMessage(q));
     quickButtonsEl.appendChild(btn);
   });
-}
+};
 
-// Обработчики модального окна
 modalYes.addEventListener('click', () => {
   hideModal();
   localStorage.removeItem(STORAGE_KEY);
@@ -272,17 +255,12 @@ modalYes.addEventListener('click', () => {
 });
 
 modalNo.addEventListener('click', hideModal);
-modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) hideModal();
-});
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) hideModal(); });
 
-// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
   loadHistory();
   initQuickButtons();
   sendButton.addEventListener('click', handleSend);
   clearButton.addEventListener('click', clearHistory);
-  questionInput.addEventListener('keypress', e => {
-    if (e.key === 'Enter') handleSend();
-  });
+  questionInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleSend(); });
 });
