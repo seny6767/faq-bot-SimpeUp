@@ -1,4 +1,4 @@
-## FAQ Чат
+## FAQ Чат SimpleUp
 FAQ чат для ответов на часто задаваемые вопросы.
 
 
@@ -9,6 +9,8 @@ FAQ чат для ответов на часто задаваемые вопро
 ## Установка и запуск
 1. Клонируйте репозиторий:
 git clone https://github.com/seny6767/faq-bot-SimpeUp.git
+
+2. Перейдите в папку проекта
 cd faq-bot-SimpeUp
 
 2. Установите зависимости:
@@ -18,7 +20,7 @@ yarn install
 Однократно: yarn build
 Режим разработки: yarn dev
 
-4. Запустите локальный сервер (обязательно!):
+4. Запустите локальный сервер(обязательно):
 VS Code: Live Server, запустить Live Server
 Через npx: npx live-server
 Python: python -m http.server

@@ -1,10 +1,10 @@
 {
-  "name": "faq-chat",
+  "name": "faq-chat-SimpleUp",
   "version": "1.0.0",
   "main": "index.html",
   "scripts": {
-    "build": "sass src/styles.scss dist/styles.css",
-    "dev": "sass --watch src/styles.scss dist/styles.css"
+    "build": "sass --no-source-map src/styles.scss dist/styles.css",
+    "dev": "sass --watch --no-source-map src/styles.scss dist/styles.css"
   },
   "devDependencies": {
     "sass": "^1.69.5"

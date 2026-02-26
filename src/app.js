@@ -6,7 +6,7 @@ const SCORE_QUESTION_WEIGHT = 2;
 const SCORE_TAG_WEIGHT = 1;
 const MIN_SCORE = 1;
 
-// элементы dom
+// DOM элементы
 const chatMessagesEl = document.getElementById('chatMessages');
 const questionInput = document.getElementById('questionInput');
 const sendButton = document.getElementById('sendButton');
@@ -14,18 +14,18 @@ const clearButton = document.getElementById('clearButton');
 const similarListEl = document.getElementById('similarList');
 const quickButtonsEl = document.getElementById('quickButtons');
 const infoSection = document.getElementById('infoSection');
-
-// модальные окна
 const modalOverlay = document.getElementById('modalOverlay');
 const modalYes = document.getElementById('modalYes');
 const modalNo = document.getElementById('modalNo');
 
+// Состояние
 let messages = [];
 let similarQuestions = [];
 let lastQuery = '';
 let typingIndicator = null;
 let isProcessing = false;
 
+// Вспомогательные функции (без изменений)
 function normalizeText(str) {
   return str.toLowerCase().replace(/[^\w\sа-яё]/gi, '').trim();
 }
@@ -34,6 +34,7 @@ function getWords(str) {
   return normalizeText(str).split(/\s+/).filter(w => w.length > 0);
 }
 
+// поиск ответа в fqa + валидациия ответа по тегам и проверка на вхождение подстроки
 function searchFAQ(query) {
   const queryWords = getWords(query);
   if (queryWords.length === 0) return [];
@@ -44,20 +45,19 @@ function searchFAQ(query) {
     const tags = item.tags ? item.tags.map(t => normalizeText(t)) : [];
 
     queryWords.forEach(qw => {
-      if (questionWords.some(qWord => qWord === qw)) {
+      if (questionWords.some(qWord => qWord.includes(qw) || qw.includes(qWord))) {
         score += SCORE_QUESTION_WEIGHT;
       }
-      if (tags.some(tag => tag === qw)) {
+      if (tags.some(tag => tag.includes(qw) || qw.includes(tag))) {
         score += SCORE_TAG_WEIGHT;
       }
     });
 
     return { item, score };
-  })
-    .filter(r => r.score > 0)
-    .sort((a, b) => b.score - a.score);
+  }).filter(r => r.score > 0).sort((a, b) => b.score - a.score);
 }
 
+// получить ответ
 function getAnswer(query) {
   const results = searchFAQ(query);
   let answer = null;
@@ -65,35 +65,33 @@ function getAnswer(query) {
 
   if (results.length > 0) {
     const best = results[0];
-    if (best.score >= MIN_SCORE) {
-      answer = best.item.a;
-    }
+    if (best.score >= MIN_SCORE) answer = best.item.a;
     similar = results.slice(0, MAX_SIMILAR).map(r => r.item.q);
   }
 
   return {
-    answer: answer || 'Извините, я не нашел точного ответа. Возможно, вам помогут похожие вопросы ниже.',
-    similar: similar.slice(0, MAX_SIMILAR)
+    answer: answer || 'Не было найдено точного ответа. Возможно, вам помогут похожие вопросы справа в колонке.',
+    similar
   };
 }
 
 function highlightMatches(text, query) {
   if (!query) return text;
   const words = getWords(query);
-  if (words.length === 0) return text;
+  if (!words.length) return text;
 
   let result = text;
   words.forEach(word => {
     const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
-    result = result.replace(regex, '<mark>$1</mark>');
+    result = result.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '<mark>$1</mark>');
   });
   return result;
 }
 
+// Отрисовка похожих вопросов
 function renderSimilar() {
   if (!similarListEl) return;
-  if (similarQuestions.length === 0) {
+  if (!similarQuestions.length) {
     similarListEl.innerHTML = '<p>Нет похожих вопросов</p>';
     return;
   }
@@ -110,6 +108,7 @@ function renderSimilar() {
   similarListEl.appendChild(list);
 }
 
+// Отрисовка сообщений
 function renderMessages() {
   chatMessagesEl.innerHTML = '';
   messages.forEach(msg => {
@@ -121,6 +120,7 @@ function renderMessages() {
   scrollToBottom();
 }
 
+// История
 function saveHistory() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
 }
@@ -128,11 +128,7 @@ function saveHistory() {
 function loadHistory() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
-    try {
-      messages = JSON.parse(saved);
-    } catch {
-      messages = [];
-    }
+    try { messages = JSON.parse(saved); } catch { messages = []; }
   } else {
     messages = [{
       sender: 'bot',
@@ -146,6 +142,7 @@ function scrollToBottom() {
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
+// Индикатор печати
 function showTypingIndicator() {
   hideTypingIndicator();
   const indicator = document.createElement('div');
@@ -163,6 +160,7 @@ function hideTypingIndicator() {
   }
 }
 
+// Анимация печати
 function typeMessage(text, element, delay = 30) {
   return new Promise(resolve => {
     let i = 0;
@@ -180,25 +178,34 @@ function typeMessage(text, element, delay = 30) {
   });
 }
 
-function addMessage(text, sender, save = true) {
-  messages.push({ text, sender, timestamp: Date.now() });
-  if (save) saveHistory();
-  renderMessages();
-}
-
-async function addBotMessageWithAnimation(text) {
+// Универсальное добавление сообщения (с анимацией для бота)
+async function addMessage(text, sender, animate = false, save = true) {
   const msgDiv = document.createElement('div');
-  msgDiv.className = 'message bot';
+  msgDiv.className = `message ${sender}`;
   chatMessagesEl.appendChild(msgDiv);
   scrollToBottom();
 
-  await typeMessage(text, msgDiv, 30);
+  if (animate && sender === 'bot') {
+    await typeMessage(text, msgDiv, 30);
+  } else {
+    msgDiv.textContent = text;
+  }
 
-  messages.push({ text, sender: 'bot', timestamp: Date.now() });
-  saveHistory();
+  messages.push({ text, sender, timestamp: Date.now() });
+  if (save) saveHistory();
 }
 
-function showClearConfirmModal() {
+// Блокировка интерфейса
+function setInterfaceLock(locked) {
+  isProcessing = locked;
+  questionInput.disabled = locked;
+  sendButton.disabled = locked;
+  clearButton.disabled = locked;
+  infoSection.classList.toggle('locked', locked);
+}
+
+// Модальное окно
+function showModal() {
   modalOverlay.style.display = 'flex';
 }
 
@@ -206,61 +213,39 @@ function hideModal() {
   modalOverlay.style.display = 'none';
 }
 
-function lockInterface() {
-  isProcessing = true;
-  questionInput.disabled = true;
-  sendButton.disabled = true;
-  clearButton.disabled = true;
-  infoSection.classList.add('locked');
-}
-
-function unlockInterface() {
-  isProcessing = false;
-  questionInput.disabled = false;
-  sendButton.disabled = false;
-  clearButton.disabled = false;
-  infoSection.classList.remove('locked');
-}
-
+// Отправка вопроса
 async function handleSend() {
   const query = questionInput.value.trim();
   if (!query || isProcessing) return;
 
-  lockInterface();
+  setInterfaceLock(true);
+  await addMessage(query, 'user');
 
-  addMessage(query, 'user');
   showTypingIndicator();
   await new Promise(resolve => setTimeout(resolve, 600));
   const { answer, similar } = getAnswer(query);
   hideTypingIndicator();
-  await addBotMessageWithAnimation(answer);
 
+  await addMessage(answer, 'bot', true);
   lastQuery = query;
   similarQuestions = similar;
   renderSimilar();
   questionInput.value = '';
-  unlockInterface();
+  setInterfaceLock(false);
 }
 
+// Отправка через быстрые кнопки / похожие вопросы
 function sendMessage(text) {
   questionInput.value = text;
   handleSend();
 }
 
+// Очистка чата
 function clearHistory() {
-  showClearConfirmModal();
+  showModal();
 }
 
-function performClear() {
-  localStorage.removeItem(STORAGE_KEY);
-  messages = [];
-  renderMessages();
-  similarQuestions = [];
-  renderSimilar();
-  addMessage('Чат очищен.', 'bot');
-  hideModal();
-}
-
+// Инициализация быстрых кнопок
 function initQuickButtons() {
   const quickList = FAQ.slice(0, 8).map(item => item.q);
   quickButtonsEl.innerHTML = '';
@@ -274,14 +259,24 @@ function initQuickButtons() {
   });
 }
 
-modalYes.addEventListener('click', performClear);
-modalNo.addEventListener('click', hideModal);
-modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) {
-    hideModal();
-  }
+// Обработчики модального окна
+modalYes.addEventListener('click', () => {
+  hideModal();
+  localStorage.removeItem(STORAGE_KEY);
+  messages = [];
+  chatMessagesEl.innerHTML = '';
+  addMessage('Чат очищен.', 'bot');
+  similarQuestions = [];
+  renderSimilar();
+  setInterfaceLock(false);
 });
 
+modalNo.addEventListener('click', hideModal);
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) hideModal();
+});
+
+// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
   loadHistory();
   initQuickButtons();
