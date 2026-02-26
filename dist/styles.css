@@ -202,14 +202,12 @@ header p {
   pointer-events: none;
 }
 
-/* Locked state for info section */
 .info-section.locked .similar-item,
 .info-section.locked .quick-btn {
   pointer-events: none;
   opacity: 0.5;
 }
 
-/* Typing indicator */
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -328,5 +326,3 @@ header p {
     max-width: 100%;
   }
 }
-
-/*# sourceMappingURL=styles.css.map */
